@@ -32,4 +32,4 @@
     <li><strong>Messaging:</strong> WebSockets for real-time chat</li>
 </ul>
 <h2>Ollama Installation</h2>
-<p>To use the AI trainer feature, you need to install Ollama on your system. You can find the installation guide and download links here: <a href="https://ollama.com" target="_blank">Ollama Official Website</a>.</p>
+<p>To use the AI trainer feature, you need to install Ollama on your system. You can find the installation guide and download links here: <a href="https://ollama.com" target="_blank">Ollama Official Website</a> and needs to run llama3.2.</p>
