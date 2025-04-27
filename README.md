@@ -35,6 +35,6 @@
 <p>To use the AI trainer feature, you need to install Ollama on your system. You can find the installation guide and download links here: <a href="https://ollama.com" target="_blank">Ollama Official Website</a> and needs to run llama3.2.</p>
 
 
-<h1>
+<h2>
     Note: ScreenShots of this website are uploaded in fitnessImages folder
-</h1>
+</h2>
