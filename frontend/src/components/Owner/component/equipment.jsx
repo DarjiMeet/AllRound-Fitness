@@ -244,7 +244,7 @@ const Equipment = ({ gymId }) => {
                     <div className="fixed inset-0 flex items-center justify-center z-50">
                         <div className="bg-white shadow-lg rounded-2xl p-6 w-[30vw] border border-gray-200">
                             <div className="flex flex-row justify-between items-center">
-                                <h2 className="text-2xl font-medium text-black">Add Trainer</h2>
+                                <h2 className="text-2xl font-medium text-black">Add Equipment</h2>
                                 <button
                                     onClick={() => setOpenAdd(!openAdd)}
                                     className="text-gray-400 hover:text-gray-600 focus:outline-none hover:cursor-pointer"

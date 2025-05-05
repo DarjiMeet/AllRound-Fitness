@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { type } from "os";
 
 const ChatSchema = new mongoose.Schema(
   {
@@ -18,10 +19,14 @@ const ChatSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    status:{
+        type:String,
+    },
     timestamp: {
       type: Date,
       default: Date.now,
     },
+    hiddenBy: { type: [String], default: [] }
   },
   { timestamps: true }
 );

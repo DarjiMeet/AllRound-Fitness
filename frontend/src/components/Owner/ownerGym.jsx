@@ -1,7 +1,7 @@
 import toast from "react-hot-toast";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
+// import { motion } from "framer-motion";
 import { FaChevronDown, FaPen, FaTrash } from "react-icons/fa";
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Nav from "./component/Navbar";
@@ -14,7 +14,7 @@ import EventsList from "./component/Events";
 const OwnerGym = () => {
 
     const {gymId} = useParams()
-    const navigate = useNavigate()
+    // const navigate = useNavigate()
     const [getGyms,setGetGyms] = useState({})
     const [reviews,setReviews] = useState([])
     const [isOpen, setIsOpen] = useState(true);
@@ -65,7 +65,7 @@ const OwnerGym = () => {
     const [error, setError] = useState(null);
     const [Gyms,setGyms] = useState([])
     const [List,setList] = useState(false)
-    const [timings, setTimings] = useState(false)
+    // const [timings, setTimings] = useState(false)
 
     const predefinedAmenities = ["WiFi", "Parking", "Swimming Pool", "Gym"];
     const predefinedActivities = ["Yoga", "Zumba", "Personal Training", "Cycling"];
@@ -147,15 +147,16 @@ const OwnerGym = () => {
                 });
 
                 if (response.data.success) {
-                    setReviews(response.data.reviews)
+                    setReviews(response.data.reviews) 
                     setAvgStar(response.data.averageRating)
                 }
             } catch (error) {
-                setError(err.response?.data?.message || "Failed to fetch events");
+                setError("");
                 console.error(error);
             }
         };
-      
+        
+        
         fetchGyms();
    
     },[gymId])
@@ -233,6 +234,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error adding activities')
+            console.error(error)
         }
     }
     const handleAmenitySubmit = async (e) => {
@@ -259,6 +261,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error adding amenities')
+            console.error(error)
         }
     }
 
@@ -297,6 +300,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error adding membership')
+            console.error(error)
         }
     }
 
@@ -316,6 +320,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error deleting membership')
+            console.error(error)
         }
     }
 
@@ -335,6 +340,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error deleting activity')
+            console.error(error)
         }
     }
 
@@ -354,6 +360,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error deleting amenity')
+            console.error(error)
         }
     }
 
@@ -373,6 +380,7 @@ const OwnerGym = () => {
             }
         } catch (error) {
             toast.error('Error deleting Photo')
+            console.error(error)
         }
     }
 

@@ -7,6 +7,8 @@ import Stripe from "stripe";
 import Event from '../model/event.model.js';
 import Chat from '../model/chat.model.js';
 import UserChat from '../model/userChat.model.js';
+import ChatUserOwner from '../model/userOwnerChat.model.js';
+import Review from '../model/review.model.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET)
 
@@ -104,7 +106,7 @@ export const userDetails = async (req,res) => {
         res.status(200).json({ success: true, user:{
             ...user._doc,
             password:undefined,
-            Mobile:undefined
+            
         } });
     } catch (error) {
         console.error("Error in userDetails:", error);
@@ -154,7 +156,7 @@ export const getSingleGym = async (req,res) => {
 
         const owner = await Owner.findById(gym.ownerId)
 
-        res.status(200).json({ success: true, gym:gym, ownerName:owner.name, ownerEmail:owner.email});
+        res.status(200).json({ success: true, gym:gym, ownerName:owner.name, ownerEmail:owner.email, ownerId: owner._id});
     } catch (error) {
         console.log("error in getSingleGym", error);
         res.status(500).json({success:false,message:"Server error"})
@@ -213,7 +215,7 @@ export const paymentCheckout = async (req,res) => {
         }
 
         const user = gym.members.find((member)=> member.memberId.toString() === userId.toString())
-        if(user.membershipStatus === 'Active'){
+        if(user && user.membershipStatus === 'Active' ){
             return res.status(400).json({success:false, message: "Already an member of this gym"})
         }
 
@@ -884,30 +886,107 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
-
-export const getRecentChat = async (req,res) => {
+export const getAllOwners = async (req, res) => {
     try {
-        const userId = req.userId
+        // const userId = req.userId
+        const owners = await Owner.find();
 
-        const chats = await UserChat.find({
-            $or:[{sender:userId}, {receiver:userId}]
-        })
+        // Sanitize user data
+        const sanitizedOwners = owners.map((user) => {
+            const { password, contactNumber, gyms, isVerified, ...safeData } = user.toObject();
+            return safeData;
+        });
 
-        const userIds = new Set()
-
-        chats.forEach(chat=>{
-            if(chat.sender.toString() !== userId) userIds.add(chat.sender.toString())
-            if(chat.receiver.toString() !== userId) userIds.add(chat.receiver.toString())
-        })
-
-        const users = await User.find({_id:{$in: Array.from(userIds)}}).select("UserName profilePic")
-
-        res.status(200).json({ success: true, users });
+        res.status(200).json({ success: true, message: "Users retrieved successfully", owners: sanitizedOwners });
     } catch (error) {
-        console.error("getUserChat Error:", error);
-        res.status(500).json({ success: false, error: "Failed to fetch chat users" });   
+        console.error("getAllUsers Error:", error);
+        res.status(500).json({ success: false, error: "Failed to get users" });
     }
-}
+};
+
+
+// Backend API: /api/user/getRecentChat
+export const getRecentChat = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Fetch all chats where the user is involved
+        const chats = await ChatUserOwner.find({
+            $or: [{ sender: userId }, { receiver: userId }],
+        })
+        .sort({ createdAt: -1 }); // Sort by most recent
+
+        // Batch populate senders and receivers
+        const senderIds = chats.map(chat => chat.sender);
+        const receiverIds = chats.map(chat => chat.receiver);
+        const uniqueIds = [...new Set([...senderIds, ...receiverIds])];
+
+        const users = await User.find({ _id: { $in: uniqueIds } }).select("UserName profilePic name email profile");
+        const owners = await Owner.find({ _id: { $in: uniqueIds } }).select("UserName profilePic name email profile");
+
+        const populatedChats = chats.map(chat => {
+            const sender = chat.senderType === "User"
+                ? users.find(user => user._id.equals(chat.sender))
+                : owners.find(owner => owner._id.equals(chat.sender));
+
+            const receiver = chat.receiverType === "User"
+                ? users.find(user => user._id.equals(chat.receiver))
+                : owners.find(owner => owner._id.equals(chat.receiver));
+
+            return {
+                ...chat.toObject(),
+                sender,
+                receiver,
+            };
+        });
+
+        // Map chats to unique chat partners
+        const mapChats = (chats, userId) => {
+            return Object.values(
+                chats.reduce((acc, chat) => {
+                    if (!chat.sender || !chat.receiver) {
+                        console.warn("Invalid chat: sender or receiver is undefined", chat);
+                        return acc; // Skip this chat
+                    }
+                    const chatPartner = chat.sender._id.equals(userId) ? chat.receiver : chat.sender;
+                    if (!acc[chatPartner._id]) {
+                        acc[chatPartner._id] = {
+                            _id: chat._id,
+                            chatPartner,
+                            lastMessage: chat.message,
+                            lastMessageAt: chat.createdAt,
+                        };
+                    }
+                    return acc;
+                }, {})
+            );
+        };
+
+        // Separate and map user-to-user and user-to-owner chats
+        const recentUserToUserChats = mapChats(
+            populatedChats.filter(chat => chat.senderType === "User" && chat.receiverType === "User"),
+            userId
+        );
+
+        const recentUserToOwnerChats = mapChats(
+            populatedChats.filter(chat =>
+                (chat.senderType === "User" && chat.receiverType === "Owner") ||
+                (chat.senderType === "Owner" && chat.receiverType === "User")
+            ),
+            userId
+        );
+
+        // Return the results
+        res.status(200).json({
+            success: true,
+            userToUserChats: recentUserToUserChats,
+            userToOwnerChats: recentUserToOwnerChats,
+        });
+    } catch (error) {
+        console.error("Error fetching recent chats:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch recent chats" });
+    }
+};
 
 export const fetchSingleUser = async (req,res) => {
     try {
@@ -922,12 +1001,188 @@ export const fetchSingleUser = async (req,res) => {
             ...user._doc,
             password:undefined,
             Bio:undefined,
-            mobile:undefined,
+            Mobile:undefined,
             GymMember:undefined,
-            EventParticipated:true
+            EventParticipated:undefined
         } });
     } catch (error) {
         console.error("fetchSingleUser Error:", error);
         res.status(500).json({ success: false, error: "Failed to fetch single users" });   
+    }
+}
+
+export const deleteForMe = async (req,res) => {
+    const {messageId} = req.body
+
+    try {
+        const userId = req.userId
+        if (!userId) {
+            return res.status(400).json({ error: "User ID is required" });
+        }
+
+        const messages =  await ChatUserOwner.updateOne(
+            { _id: messageId },
+            { $addToSet: { hiddenBy: userId } } // Add userId to "hiddenBy" array (prevents duplicates)
+        );
+        res.json({ success: true, message: "Message hidden successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to hide message" });  
+    }
+}
+
+// export const deleteForAll = async (req,res) => {
+//     const {messageId} = req.body
+
+//     try {
+//         const userId = req.userId
+//         if (!userId) {
+//             return res.status(400).json({ message: "User ID is required" });
+//         }
+
+//         const messages = await ChatUserOwner.deleteOne({_id:messageId})
+//         res.json({ success: true, message: "Message deleted successfully" });
+//     } catch (error) {
+//         res.status(500).json({ message: "Failed to delete message" });
+//     }
+// }
+
+export const newMessages = async (req, res) => {
+    try {
+        const userId = req.userId; // Get logged-in user ID
+
+        // Find all messages sent to this user that are not yet delivered
+        const undeliveredMessages = await ChatUserOwner.find({
+            receiver: userId,
+            status: "sent" // Only messages that are not yet delivered
+        }).sort({ createdAt: -1 });
+
+        if (undeliveredMessages.length === 0) {
+            return res.status(200).json({ success: true, users: [] });
+        }
+
+        // Get unique senders from undelivered messages
+        const senderIds = [...new Set(undeliveredMessages.map(msg => msg.sender.toString()))];
+
+        // Fetch sender details based on senderType (User or Owner)
+        const users = await Promise.all(senderIds.map(async (senderId) => {
+            const message = undeliveredMessages.find(msg => msg.sender.toString() === senderId);
+            if (message.senderType === "User") {
+                const user = await  User.findById(senderId).select("UserName profilePic");
+                return {...user.toObject(), senderType:"User"}
+            } else if (message.senderType === "Owner") {
+                const owner = await Owner.findById(senderId).select("UserName profilePic");
+                return { ...owner.toObject(), senderType: "Owner" };
+            }
+        }));
+
+        // Filter out null values (if any)
+        const filteredUsers = users.filter(user => user !== null);
+
+        return res.status(200).json({ success: true, users: filteredUsers });
+
+    } catch (error) {
+        console.error("Error fetching new messages:", error);
+        res.status(500).json({ success: false, error: "Failed to fetch new messages" });
+    }
+};
+
+
+export const fetchSingleOwner = async (req, res) => {
+    try {
+
+        const { ownerId } = req.body;
+
+        // Check if ownerId is provided
+        if (!ownerId) {
+            return res.status(400).json({ success: false, message: "Owner ID is required" });
+        }
+
+        // Fetch the owner from the database
+        const owner = await Owner.findById(ownerId).select("-password -contactNumber -gyms"); // Exclude the password field
+
+        // Check if the owner exists
+        if (!owner) {
+            return res.status(404).json({ success: false, message: "Owner not found" });
+        }
+
+        // Return the owner details
+        res.status(200).json({ success: true, owner });
+    } catch (error) {
+        console.error("Error fetching owner details:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch owner details" });
+    }
+};
+
+export const addReviews = async (req,res) => {
+    const {gymId,userName,star,comment} = req.body
+
+    try {
+        if (!gymId || !userName || !star || !comment) {
+            return res.status(400).json({ success: false, message: "Gym ID, star, userName and comment are required." });
+        }
+
+
+        const gym = await Gym.findById( gymId )
+        if (!gym) {
+            return res.status(404).json({ success: false, message: "Gym not found" });
+        }
+
+        const review = new Review({
+            gym:gym._id,
+            userName:userName,
+            star:star,
+            comment:comment
+        })
+        await review.save()
+
+        gym.gymReview.push(review._id)
+        await gym.save()
+
+        return res.status(200).json({
+            success: true,
+            message: "Review added successfully successfully",
+            review:review
+        });
+    } catch (error) {
+        console.error("Error in addReviews:", error);
+        return res.status(500).json({ success: false, message: "Server error, please try again later" });
+    }
+}
+
+export const getReviews = async (req,res) => {
+    const {gymId} = req.body
+
+    try {
+        if (!gymId) {
+            return res.status(400).json({ success: false, message: "Gym ID is required" });
+        }
+
+
+        const gym = await Gym.findById(gymId)
+        if (!gym) {
+            return res.status(404).json({ success: false, message: "Gym not found" });
+        }
+
+        const review = await Review.find({gym:gym._id})
+        if(!review){
+            return res.status(404).json({ success: false, message: "No reviews yet" });
+        }
+
+        const totalReview = review.reduce((acc, review)=> acc + review.star,0)
+        const averageRating = (totalReview / review.length).toFixed(1)
+        gym.avgReview = parseFloat(averageRating)
+        await gym.save()
+
+        return res.status(200).json({
+                success: true,
+                message: "Reviews retrieved successfully",
+                averageRating: parseFloat(averageRating) || 0,
+                reviews:review
+        });
+
+
+    } catch (error) {
+        console.error("Error fetching Reviews:", error);
+        return res.status(500).json({ success: false, message: "Server error, please try again later" });
     }
 }

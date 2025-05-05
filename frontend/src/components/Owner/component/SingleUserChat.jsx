@@ -3,15 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FaUserCircle, FaUser, FaIdBadge, FaRobot, FaRegCalendarAlt, FaRegEnvelope, FaPaperPlane, FaArrowLeft, FaTrash } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGym } from "../userContext";
 import { io } from "socket.io-client";
+import Nav from "./Navbar";
+
 
 const socket = io("http://localhost:5000");
 
-const SingleUserChat = () => {
+const SingleUserC = () => {
     const navigate = useNavigate();
-    const [isOpen, setIsOpen] = useState(false);
-    const { user } = useGym();
     const { userId } = useParams();
     const [userD, setUserD] = useState([]);
     const [messages, setMessages] = useState([]);
@@ -19,6 +18,22 @@ const SingleUserChat = () => {
     const [hoveredMessage, setHoveredMessage] = useState(null);
     const chatRef = useRef(null);
     const [openImage, setOpenImage] = useState(false);
+    const [user, setUser] = useState([])
+    const [getGyms,setGetGyms] = useState([])
+
+    useEffect(() => {
+        const fetchUserDetails = async () => {
+            try {
+                const response = await axios.post("http://localhost:5000/api/owner/ownerDetails", {}, { withCredentials: true });
+                if (response.data.success) {
+                    setUser(response.data.owner);
+                }
+            } catch (err) {
+                console.error("Error fetching user details:", err);
+            }
+        };
+        fetchUserDetails();
+    }, []);
 
     const handleMessage = useCallback(({ sender, senderType, message, receiver, receiverType, _id }) => {
         if (receiver === user?._id) {
@@ -43,21 +58,11 @@ const SingleUserChat = () => {
         chatRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const handleLogout = async () => {
-        try {
-            await axios.post("http://localhost:5000/api/user/logout", {}, { withCredentials: true });
-            toast.success("Logout successfully");
-            navigate("/");
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to log out");
-        }
-    };
 
     useEffect(() => {
         const fetChUserDetails = async () => {
             try {
-                const response = await axios.post("http://localhost:5000/api/user/fetchSingleUser", { userId }, { withCredentials: true });
+                const response = await axios.post("http://localhost:5000/api/owner/fetchSingleUser", { userId }, { withCredentials: true });
                 if (response.data.success) {
                     setUserD(response.data.user);
                 }
@@ -71,7 +76,7 @@ const SingleUserChat = () => {
     useEffect(() => {
         if (!user || !userId) return;
 
-        socket.emit("join", { userId: user._id, userType: "User", receiverId: userId, receiverType: "User" });
+        socket.emit("join", { userId: user._id, userType: "Owner", receiverId: userId, receiverType: "User" });
 
         socket.on("chatHistory", (messages) => {
             const filteredMessages = messages.filter(msg => !msg.hiddenBy?.includes(user._id));
@@ -94,7 +99,7 @@ const SingleUserChat = () => {
 
         socket.emit("sendMessage", {
             sender: user._id,
-            senderType: "User",
+            senderType: "Owner",
             receiver: userId,
             receiverType: "User",
             message: newMessage
@@ -109,12 +114,12 @@ const SingleUserChat = () => {
 
     const handleBack = () => {
         socket.emit("leave", { userId: user._id });
-        navigate("/user/messages");
+        navigate("/owner/messages");
     };
 
     const handleDeleteForMe = async (messageId) => {
         try {
-            const response = await axios.post('http://localhost:5000/api/user/deleteForMe', { messageId }, {
+            const response = await axios.post('http://localhost:5000/api/owner/deleteForMe', { messageId }, {
                 withCredentials: true
             });
 
@@ -137,57 +142,32 @@ const SingleUserChat = () => {
         }
     };
 
+    useEffect(()=>{
+
+        const fetchGyms = async () => {
+            try {
+                const response = await axios.post("http://localhost:5000/api/owner/getGyms", {}, {
+                    withCredentials: true,
+                });
+
+                if (response.data.success) {
+                    setGetGyms(response.data.data); // Update to match your backend response structure
+                }
+            } catch (error) {
+                toast.error("Unable to fetch your gyms");
+                console.error(error);
+            }
+        };
+
+        fetchGyms();
+        
+    },[])
+
+
     return (
         <div>
-            <nav className="flex flex-row px-20 py-3 items-center justify-between border-b-2 border-neutral-400 shadow-md bg-white">
-                {/* Logo */}
-                <div className="flex flex-row items-center hover:cursor-pointer hover:opacity-80">
-                    <div className="text-2xl font-bold text-black" onClick={() => navigate('/user/home')}>
-                        All-Round<span className="text-gray-500">Fitness</span>
-                    </div>
-                </div>
 
-                {/* User Profile Dropdown */}
-                <div className="relative">
-                    <div className="flex flex-row px-3 py-2 items-center rounded-3xl hover:cursor-pointer hover:opacity-80" onClick={() => setIsOpen(!isOpen)}>
-                        {user?.profilePic ? (
-                            <img src={user.profilePic} alt="Profile" className="w-[60px] h-[60px] rounded-full object-cover" />
-                        ) : (
-                            <FaUserCircle size={50} className="text-black ml-5" />
-                        )}
-                    </div>
-
-                    {isOpen && (
-                        <div className="absolute bg-black text-white rounded-lg shadow-lg right-0 w-48">
-                            <ul>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center">
-                                    <FaUser size={15} className="mr-2" />
-                                    <div>My Profile</div>
-                                </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/membership')}>
-                                    <FaIdBadge size={15} className="mr-2" />
-                                    <div>Memberships</div>
-                                </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/ai-trainer')}>
-                                    <FaRobot size={15} className="mr-2" />
-                                    <div>AI Trainer</div>
-                                </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/your-events')}>
-                                    <FaRegCalendarAlt size={15} className="mr-2" />
-                                    <div>Your Events</div>
-                                </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/messages')}>
-                                    <FaRegEnvelope size={15} className="mr-2" />
-                                    <div>Messages</div>
-                                </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer" onClick={handleLogout}>
-                                    Logout
-                                </li>
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            </nav>
+            <Nav getGyms={getGyms}/>
 
             <div className="flex flex-col h-[85vh] bg-gray-100">
                 {/* Header */}
@@ -306,4 +286,4 @@ const SingleUserChat = () => {
     );
 };
 
-export default SingleUserChat;
+export default SingleUserC;

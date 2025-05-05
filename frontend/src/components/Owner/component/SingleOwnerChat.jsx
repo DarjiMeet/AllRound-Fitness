@@ -3,25 +3,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FaUserCircle, FaUser, FaIdBadge, FaRobot, FaRegCalendarAlt, FaRegEnvelope, FaPaperPlane, FaArrowLeft, FaTrash } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGym } from "../userContext";
+// import { useGym } from "../userContext";
 import { io } from "socket.io-client";
 
 const socket = io("http://localhost:5000");
 
-const SingleUserChat = () => {
+const OwnerChat = () => {
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
-    const { user } = useGym();
-    const { userId } = useParams();
-    const [userD, setUserD] = useState([]);
+    // const { user } = useGym();
+    const { ownerId } = useParams(); // Changed from userId to ownerId
+    const [ownerD, setOwnerD] = useState([]); // Changed from userD to ownerD
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [hoveredMessage, setHoveredMessage] = useState(null);
     const chatRef = useRef(null);
     const [openImage, setOpenImage] = useState(false);
+    const [getme, SetgetMe] = useState([])
+
+    useEffect(()=>{
+        const details =async ()=>{
+            try {
+                const response = await axios.post("http://localhost:5000/api/owner/ownerDetails", {  }, { withCredentials: true });
+                if (response.data.success) {
+                    SetgetMe(response.data.owner); // Changed from user to owner
+                }
+            } catch (error) {
+                toast.error("Unable to fetch this owner");
+                console.error(error)
+            }
+        }
+            details()
+    },[]) 
 
     const handleMessage = useCallback(({ sender, senderType, message, receiver, receiverType, _id }) => {
-        if (receiver === user?._id) {
+        if (receiver === getme?._id) {
             setMessages((prevMessages) => {
                 // Prevent duplicate messages
                 return prevMessages.some((msg) => msg._id === _id)
@@ -29,15 +45,15 @@ const SingleUserChat = () => {
                     : [...prevMessages, { _id, sender, senderType, message, receiver, receiverType }];
             });
         }
-    }, [user?._id]);
+    }, [getme?._id]);
 
-    const deleteMessage = useCallback(({messageId})=>{
+    const deleteMessage = useCallback(({ messageId }) => {
         setMessages((prevMessages) => {
             const updatedMessages = prevMessages.filter(msg => msg._id.toString() !== messageId.toString());
             console.log("Updated messages:", updatedMessages);
             return updatedMessages;
         });
-    },[])
+    }, []);
 
     useEffect(() => {
         chatRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,7 +61,7 @@ const SingleUserChat = () => {
 
     const handleLogout = async () => {
         try {
-            await axios.post("http://localhost:5000/api/user/logout", {}, { withCredentials: true });
+            await axios.post("http://localhost:5000/api/owner/logout", {}, { withCredentials: true });
             toast.success("Logout successfully");
             navigate("/");
         } catch (error) {
@@ -55,26 +71,26 @@ const SingleUserChat = () => {
     };
 
     useEffect(() => {
-        const fetChUserDetails = async () => {
+        const fetchOwnerDetails = async () => {
             try {
-                const response = await axios.post("http://localhost:5000/api/user/fetchSingleUser", { userId }, { withCredentials: true });
+                const response = await axios.post("http://localhost:5000/api/owner/fetchSingleOwner", { ownerId }, { withCredentials: true });
                 if (response.data.success) {
-                    setUserD(response.data.user);
+                    setOwnerD(response.data.owner); // Changed from user to owner
                 }
             } catch (error) {
-                toast.error("Unable to fetch this user");
+                toast.error("Unable to fetch this owner");
             }
         };
-        fetChUserDetails();
-    }, [userId]);
+        fetchOwnerDetails();
+    }, [ownerId]);
 
     useEffect(() => {
-        if (!user || !userId) return;
+        if (!getme || !ownerId) return;
 
-        socket.emit("join", { userId: user._id, userType: "User", receiverId: userId, receiverType: "User" });
+        socket.emit("join", { userId: getme._id, userType: "Owner", receiverId: ownerId, receiverType: "Owner" });
 
         socket.on("chatHistory", (messages) => {
-            const filteredMessages = messages.filter(msg => !msg.hiddenBy?.includes(user._id));
+            const filteredMessages = messages.filter(msg => !msg.hiddenBy?.includes(getme._id));
             setMessages(filteredMessages);
         });
 
@@ -85,36 +101,35 @@ const SingleUserChat = () => {
         return () => {
             socket.off("receiveMessage", handleMessage);
             socket.off("chatHistory");
-            socket.off("messageDeleted",deleteMessage);
+            socket.off("messageDeleted", deleteMessage);
         };
-    }, [user, userId, handleMessage, deleteMessage]);
+    }, [getme, ownerId, handleMessage, deleteMessage]);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
 
         socket.emit("sendMessage", {
-            sender: user._id,
-            senderType: "User",
-            receiver: userId,
-            receiverType: "User",
+            sender: getme._id,
+            senderType: "Owner",
+            receiver: ownerId,
+            receiverType: "Owner",
             message: newMessage
         });
-        
+
         socket.once("messageSent", (newMessage) => {
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             setNewMessage("");
         });
-       
     };
 
     const handleBack = () => {
-        socket.emit("leave", { userId: user._id });
-        navigate("/user/messages");
+        socket.emit("leave", { userId: getme._id });
+        navigate(-1);
     };
 
     const handleDeleteForMe = async (messageId) => {
         try {
-            const response = await axios.post('http://localhost:5000/api/user/deleteForMe', { messageId }, {
+            const response = await axios.post('http://localhost:5000/api/owner/deleteForMe', { messageId }, {
                 withCredentials: true
             });
 
@@ -128,8 +143,7 @@ const SingleUserChat = () => {
         try {
             // Emit the "delete" event to the server
             socket.emit("delete", { messageId });
-            
-    
+
             toast.success("Message deleted for all users");
         } catch (error) {
             console.error("Error deleting message:", error);
@@ -142,7 +156,7 @@ const SingleUserChat = () => {
             <nav className="flex flex-row px-20 py-3 items-center justify-between border-b-2 border-neutral-400 shadow-md bg-white">
                 {/* Logo */}
                 <div className="flex flex-row items-center hover:cursor-pointer hover:opacity-80">
-                    <div className="text-2xl font-bold text-black" onClick={() => navigate('/user/home')}>
+                    <div className="text-2xl font-bold text-black" onClick={() => navigate('/owner/home')}>
                         All-Round<span className="text-gray-500">Fitness</span>
                     </div>
                 </div>
@@ -150,8 +164,8 @@ const SingleUserChat = () => {
                 {/* User Profile Dropdown */}
                 <div className="relative">
                     <div className="flex flex-row px-3 py-2 items-center rounded-3xl hover:cursor-pointer hover:opacity-80" onClick={() => setIsOpen(!isOpen)}>
-                        {user?.profilePic ? (
-                            <img src={user.profilePic} alt="Profile" className="w-[60px] h-[60px] rounded-full object-cover" />
+                        {getme?.profilePic ? (
+                            <img src={getme.profilePic} alt="Profile" className="w-[60px] h-[60px] rounded-full object-cover" />
                         ) : (
                             <FaUserCircle size={50} className="text-black ml-5" />
                         )}
@@ -194,12 +208,12 @@ const SingleUserChat = () => {
                 <div className="flex items-center justify-start p-4 bg-white shadow-md">
                     <FaArrowLeft size={25} className="text-gray-600 cursor-pointer" onClick={handleBack} />
                     <div className="flex items-center space-x-3 mx-4">
-                        {userD.profilePic ? (
-                            <img src={userD.profilePic} alt="Profile" className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setOpenImage(true)} />
+                        {ownerD.profile ? (
+                            <img src={ownerD.profile} alt="Profile" className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setOpenImage(true)} />
                         ) : (
                             <FaUserCircle size={40} className="text-gray-600" />
                         )}
-                        <span className="text-lg font-semibold ">{userD.UserName || "User"}</span>
+                        <span className="text-lg font-semibold ">{ownerD.name || "Owner"}</span>
                     </div>
                 </div>
 
@@ -246,11 +260,11 @@ const SingleUserChat = () => {
                                         </div>
                                     )}
                                     <div
-                                        className={`relative flex ${msg.sender === user._id ? "justify-end" : "justify-start"}`}
+                                        className={`relative flex ${msg.sender === getme._id ? "justify-end" : "justify-start"}`}
                                         onMouseEnter={() => setHoveredMessage(msg._id)}
                                         onMouseLeave={() => setHoveredMessage(null)}
                                     >
-                                        <div className={`p-3 rounded-lg text-white ${msg.sender === user._id ? "bg-blue-500" : "bg-gray-500"}`} ref={index === messages.length - 1 ? chatRef : null}>
+                                        <div className={`p-3 rounded-lg text-white ${msg.sender === getme._id ? "bg-blue-500" : "bg-gray-500"}`} ref={index === messages.length - 1 ? chatRef : null}>
                                             {msg.message}
                                             <div className="text-xs text-gray-300 mt-1 text-right">{messageTime}</div>
                                         </div>
@@ -258,7 +272,7 @@ const SingleUserChat = () => {
                                             <button
                                                 className="absolute top-1 text-gray-300 hover:text-red-500 cursor-pointer"
                                                 onClick={() =>
-                                                    msg.sender === user._id ? handleDeleteForAll(msg._id) : handleDeleteForMe(msg._id)
+                                                    msg.sender === getme._id ? handleDeleteForAll(msg._id) : handleDeleteForMe(msg._id)
                                                 }
                                             >
                                                 <FaTrash size={14} />
@@ -297,7 +311,7 @@ const SingleUserChat = () => {
                     <div className="fixed inset-0 flex items-center justify-center z-50">
                         <div>
                             <div className="text-right"><button className='text-3xl text-white cursor-pointer' onClick={() => setOpenImage(false)}>X</button></div>
-                            <img src={userD.profilePic} alt="Profile" className="w-100 h-100 rounded-lg" />
+                            <img src={ownerD.profile} alt="Profile" className="w-100 h-100 rounded-lg" />
                         </div>
                     </div>
                 </>
@@ -306,4 +320,4 @@ const SingleUserChat = () => {
     );
 };
 
-export default SingleUserChat;
+export default OwnerChat;

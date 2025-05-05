@@ -8,10 +8,11 @@ export const GymProvider = ({children}) =>{
     const [gym, setGym] = useState(null)
     const [ownerName, setOwnerName] = useState("")
     const [ownerEmail, setOwnerEmail] = useState("")
+    const [ownerId, setOwnerId] = useState("")
     const [user, setUser] = useState(null);
     const [membership, setMembership] = useState([])
-    const [activeEvents, setActiveEvents] = useState([]);
-    const [inactiveEvents, setInactiveEvents] = useState([]);
+    // const [activeEvents, setActiveEvents] = useState([]);
+    // const [inactiveEvents, setInactiveEvents] = useState([]);
 
 
     const {gymId} = useParams()
@@ -24,6 +25,7 @@ export const GymProvider = ({children}) =>{
                     setGym(response.data.gym);
                     setOwnerName(response.data.ownerName)
                     setOwnerEmail(response.data.ownerEmail)
+                    setOwnerId(response.data.ownerId)
                 }
             } catch (error) {
                 console.error("Error fetching gym details:", error);
@@ -80,7 +82,7 @@ export const GymProvider = ({children}) =>{
     // }, []);
 
     return (
-        <GymContext.Provider value={{gym,ownerName,ownerEmail,user,membership}}>
+        <GymContext.Provider value={{gym,ownerName,ownerEmail,user,membership,ownerId }}>
             {children}
         </GymContext.Provider>
     )

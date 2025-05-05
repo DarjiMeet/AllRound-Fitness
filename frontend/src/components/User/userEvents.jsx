@@ -5,6 +5,9 @@ import { useGym } from "./userContext";
 import { useNavigate } from "react-router-dom";
 import { FaUserCircle, FaUser, FaIdBadge, FaRegCalendarAlt, FaRegEnvelope, FaSearch } from "react-icons/fa";
 import Events from "./component/events";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000");
 
 const UserEvents = () => {
     const [myEvents, setMyEvents] = useState([]);
@@ -13,6 +16,8 @@ const UserEvents = () => {
     const { user } = useGym();
     const [search, setSearch] = useState("");  
     const [startDate, setStartDate] = useState("");  
+    const [newUserMessages, setNewUserMessages] = useState(new Set());
+    const [newOwnerMessages, setNewOwnerMessages] = useState(new Set());
 
     const handleSearchChange = (e) => {
         setSearch(e.target.value);
@@ -20,6 +25,17 @@ const UserEvents = () => {
 
     const handleDateChange = (e) => {
         setStartDate(e.target.value);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await axios.post("http://localhost:5000/api/user/logout", {}, { withCredentials: true });
+            toast.success("Logout successfully");
+            navigate("/");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to log out");
+        }
     };
 
     useEffect(() => {
@@ -39,6 +55,41 @@ const UserEvents = () => {
 
         fetchMyEvents();
     }, []);
+
+    const fetchNewMessages = async () => {
+        try {
+            const response = await axios.post("http://localhost:5000/api/user/newMessages", {}, {
+                withCredentials: true
+            });
+            if (response.data.success) {
+                const users = response.data.users.filter(user => user.senderType === "User");
+                const owners = response.data.users.filter(user => user.senderType === "Owner");
+    
+                // Update states with new message IDs
+                setNewUserMessages(new Set(users.map(user => user._id)));
+                setNewOwnerMessages(new Set(owners.map(owner => owner._id)));
+            }
+        } catch (error) {
+            console.log(error)
+            toast.error("Failed to fetch new messages");
+        }
+    };
+
+    useEffect(() => {
+        fetchNewMessages();
+    }, []);
+
+    useEffect(() => {
+        socket.on("newMessage", () => {
+            console.log("New message received! Updating chat...");
+            fetchNewMessages();
+        });
+
+        return () => {
+            socket.off("newMessage");
+        };
+    }, []);
+
 
     // Filtered events based on event name and/or start date
     const filteredEvents = myEvents.filter((event) => {
@@ -84,9 +135,15 @@ const UserEvents = () => {
                                     <FaRegCalendarAlt size={15} className="mr-2" />
                                     <div> Your Events</div>
                                 </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center">
+                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/messages')}>
                                     <FaRegEnvelope size={15} className="mr-2" />
                                     <div>Messages</div>
+                                    {(newUserMessages.size > 0 || newOwnerMessages.size > 0) && ( // Render red dot if there are new messages
+                                        <span className=" bg-red-500 rounded-full ml-2 px-[4px] p text-sm text-white">{newUserMessages.size + newOwnerMessages.size}</span>
+                                    )}
+                                </li>
+                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer" onClick={handleLogout}>
+                                    Logout
                                 </li>
                             </ul>
                         </div>

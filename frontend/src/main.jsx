@@ -30,6 +30,12 @@ import UserEvents from './components/User/userEvents.jsx'
 import AIchat from './components/User/Ai_trainer.jsx'
 import Messages from './components/User/messages.jsx'
 import SingleUserChat from './components/User/component/singleUserChat.jsx'
+import UserProfile from './components/User/userProfile.jsx'
+import SingleOwnerChat from './components/User/component/singleOwnerChat.jsx'
+import MessagesOwner from './components/Owner/messages.jsx'
+import SingleUserC from './components/Owner/component/singleUserChat.jsx'
+import OwnerChat from './components/Owner/component/SingleOwnerChat.jsx'
+import Profile from './components/Owner/ownerProfile.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -105,10 +111,26 @@ createRoot(document.getElementById('root')).render(
           </CheckUserAuth>
         } />
 
+        <Route path="/user/profile" element={
+          <CheckUserAuth>
+            <GymProvider>
+              <UserProfile/>
+            </GymProvider>
+          </CheckUserAuth>
+        } />
+
         <Route path="/user/messages/:userId" element={
           <CheckUserAuth>
             <GymProvider>
               <SingleUserChat/>
+            </GymProvider>
+          </CheckUserAuth>
+        } />
+
+        <Route path="/user/owner/messages/:ownerId" element={
+          <CheckUserAuth>
+            <GymProvider>
+              <SingleOwnerChat/>
             </GymProvider>
           </CheckUserAuth>
         } />
@@ -144,6 +166,30 @@ createRoot(document.getElementById('root')).render(
         <Route path="/owner/gym/:gymId/event/:eventId" element={
           <CheckAuth>
             <GymEvent/>
+          </CheckAuth>
+        } />
+
+        <Route path="/owner/messages" element={
+          <CheckAuth>
+            <MessagesOwner/>
+          </CheckAuth>
+        } />
+   
+        <Route path="/owner/messages/:userId" element={
+          <CheckAuth>
+            <SingleUserC/>
+          </CheckAuth>
+        } />
+
+        <Route path="/owner/user/messages/:ownerId" element={
+          <CheckAuth>
+            <OwnerChat/>
+          </CheckAuth>
+        } />
+   
+        <Route path="/owner/profile" element={
+          <CheckAuth>
+            <Profile/>
           </CheckAuth>
         } />
    

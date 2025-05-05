@@ -1,5 +1,5 @@
 import express from 'express'
-import { addActivity, addAmenity, addEquipments, addEvents, addMemberPlan, addMembers, addParticipants, addPhotos, addReviews, addTrainers, checkAuth, createGym, decreaseQuantity, deleteActivity, deleteAmenity, deleteEquipment, deleteEvent, deleteGym, deleteGymTiming, deleteMember, deleteMembership, deleteParticipants, deleteTrainer, deltePhotos, editGymDetails, getEquipments, getEvents, getGym, getMembers, getParticipants, getReviews, getSingleEvent, getSingleGym, getSingleMember, getSingleTrainer, getTrainer, increaseQuantity, markAttendance, ownerLogin, ownerLogout, ownerRegister, setList, updateEvent, updateTrainer, verifyEmail } from '../controller/owner.controller.js'
+import { addActivity, addAmenity, addEquipments, addEvents, addMemberPlan, addMembers, addParticipants, addPhotos, addReviews, addTrainers, checkAuth, createGym, decreaseQuantity, deleteActivity, deleteAmenity, deleteEquipment, deleteEvent, deleteForMe, deleteGym, deleteGymTiming, deleteMember, deleteMembership, deleteParticipants, deleteTrainer, deltePhotos, editGymDetails, fetchSingleOwner, fetchSingleUser, getAllOwners, getAllUsers, getEquipments, getEvents, getGym, getMembers, getParticipants, getRecentChat, getReviews, getSingleEvent, getSingleGym, getSingleMember, getSingleTrainer, getTrainer, increaseQuantity, markAttendance, newMessages, ownerDetails, ownerLogin, ownerLogout, ownerRegister, setList, updateEvent, updateTrainer, verifyEmail } from '../controller/owner.controller.js'
 import { verifyToken } from '../middleware/verifyToken.js'
 
 const router = express.Router()
@@ -93,5 +93,21 @@ router.post('/setList',verifyToken,setList)
 router.post('/deleteTiming',verifyToken,deleteGymTiming)
 
 router.post('/markAttendance',verifyToken,markAttendance)
+
+router.post('/getRecentChat',verifyToken,getRecentChat)
+
+router.post('/newMessages',verifyToken,newMessages)
+
+router.post('/ownerDetails',verifyToken,ownerDetails)
+
+router.post('/getAllOwners',verifyToken,getAllOwners)
+
+router.post('/getAllUsers',verifyToken,getAllUsers)
+
+router.post('/fetchSingleUser',verifyToken,fetchSingleUser)
+
+router.post('/fetchSingleOwner',verifyToken,fetchSingleOwner)
+
+router.post('/deleteForMe',verifyToken,deleteForMe)
 
 export default router

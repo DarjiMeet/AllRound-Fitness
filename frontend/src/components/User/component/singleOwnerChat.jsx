@@ -8,12 +8,12 @@ import { io } from "socket.io-client";
 
 const socket = io("http://localhost:5000");
 
-const SingleUserChat = () => {
+const SingleOwnerChat = () => {
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const { user } = useGym();
-    const { userId } = useParams();
-    const [userD, setUserD] = useState([]);
+    const { ownerId } = useParams(); // Changed from userId to ownerId
+    const [ownerD, setOwnerD] = useState([]); // Changed from userD to ownerD
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [hoveredMessage, setHoveredMessage] = useState(null);
@@ -31,13 +31,13 @@ const SingleUserChat = () => {
         }
     }, [user?._id]);
 
-    const deleteMessage = useCallback(({messageId})=>{
+    const deleteMessage = useCallback(({ messageId }) => {
         setMessages((prevMessages) => {
             const updatedMessages = prevMessages.filter(msg => msg._id.toString() !== messageId.toString());
             console.log("Updated messages:", updatedMessages);
             return updatedMessages;
         });
-    },[])
+    }, []);
 
     useEffect(() => {
         chatRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,23 +55,23 @@ const SingleUserChat = () => {
     };
 
     useEffect(() => {
-        const fetChUserDetails = async () => {
+        const fetchOwnerDetails = async () => {
             try {
-                const response = await axios.post("http://localhost:5000/api/user/fetchSingleUser", { userId }, { withCredentials: true });
+                const response = await axios.post("http://localhost:5000/api/user/fetchSingleOwner", { ownerId }, { withCredentials: true });
                 if (response.data.success) {
-                    setUserD(response.data.user);
+                    setOwnerD(response.data.owner); // Changed from user to owner
                 }
             } catch (error) {
-                toast.error("Unable to fetch this user");
+                toast.error("Unable to fetch this owner");
             }
         };
-        fetChUserDetails();
-    }, [userId]);
+        fetchOwnerDetails();
+    }, [ownerId]);
 
     useEffect(() => {
-        if (!user || !userId) return;
+        if (!user || !ownerId) return;
 
-        socket.emit("join", { userId: user._id, userType: "User", receiverId: userId, receiverType: "User" });
+        socket.emit("join", { userId: user._id, userType: "User", receiverId: ownerId, receiverType: "Owner" });
 
         socket.on("chatHistory", (messages) => {
             const filteredMessages = messages.filter(msg => !msg.hiddenBy?.includes(user._id));
@@ -85,9 +85,9 @@ const SingleUserChat = () => {
         return () => {
             socket.off("receiveMessage", handleMessage);
             socket.off("chatHistory");
-            socket.off("messageDeleted",deleteMessage);
+            socket.off("messageDeleted", deleteMessage);
         };
-    }, [user, userId, handleMessage, deleteMessage]);
+    }, [user, ownerId, handleMessage, deleteMessage]);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
@@ -95,21 +95,20 @@ const SingleUserChat = () => {
         socket.emit("sendMessage", {
             sender: user._id,
             senderType: "User",
-            receiver: userId,
-            receiverType: "User",
+            receiver: ownerId,
+            receiverType: "Owner",
             message: newMessage
         });
-        
+
         socket.once("messageSent", (newMessage) => {
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             setNewMessage("");
         });
-       
     };
 
     const handleBack = () => {
         socket.emit("leave", { userId: user._id });
-        navigate("/user/messages");
+        navigate(-1);
     };
 
     const handleDeleteForMe = async (messageId) => {
@@ -128,8 +127,7 @@ const SingleUserChat = () => {
         try {
             // Emit the "delete" event to the server
             socket.emit("delete", { messageId });
-            
-    
+
             toast.success("Message deleted for all users");
         } catch (error) {
             console.error("Error deleting message:", error);
@@ -194,12 +192,12 @@ const SingleUserChat = () => {
                 <div className="flex items-center justify-start p-4 bg-white shadow-md">
                     <FaArrowLeft size={25} className="text-gray-600 cursor-pointer" onClick={handleBack} />
                     <div className="flex items-center space-x-3 mx-4">
-                        {userD.profilePic ? (
-                            <img src={userD.profilePic} alt="Profile" className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setOpenImage(true)} />
+                        {ownerD.profile ? (
+                            <img src={ownerD.profile} alt="Profile" className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setOpenImage(true)} />
                         ) : (
                             <FaUserCircle size={40} className="text-gray-600" />
                         )}
-                        <span className="text-lg font-semibold ">{userD.UserName || "User"}</span>
+                        <span className="text-lg font-semibold ">{ownerD.name || "Owner"}</span>
                     </div>
                 </div>
 
@@ -297,7 +295,7 @@ const SingleUserChat = () => {
                     <div className="fixed inset-0 flex items-center justify-center z-50">
                         <div>
                             <div className="text-right"><button className='text-3xl text-white cursor-pointer' onClick={() => setOpenImage(false)}>X</button></div>
-                            <img src={userD.profilePic} alt="Profile" className="w-100 h-100 rounded-lg" />
+                            <img src={ownerD.profile} alt="Profile" className="w-100 h-100 rounded-lg" />
                         </div>
                     </div>
                 </>
@@ -306,4 +304,4 @@ const SingleUserChat = () => {
     );
 };
 
-export default SingleUserChat;
+export default SingleOwnerChat;

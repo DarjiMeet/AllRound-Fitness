@@ -8,7 +8,7 @@ import Event from '../model/event.model.js'
 import User from '../model/user.model.js'
 import sendVerificationEmail from '../mail/email.js'
 import Review from '../model/review.model.js'
-import GymAnalytics from '../model/analytics.model.js';
+import ChatUserOwner from '../model/userOwnerChat.model.js';
 
 export const ownerRegister = async(req,res)=>{
     const{email,fullname,mobile,password,confirmpassword} = req.body
@@ -1796,3 +1796,249 @@ export const markAttendance = async (req,res) => {
         res.status(500).json({ success: false, message: "Internal Server Error" });
       }
 }
+
+export const getRecentChat = async (req, res) => {
+    try {
+        const ownerId = req.ownerId;
+
+        // Fetch all chats where the user is involved
+        const chats = await ChatUserOwner.find({
+            $or: [{ sender: ownerId }, { receiver: ownerId }],
+        })
+        .sort({ createdAt: -1 }); // Sort by most recent
+
+        // Batch populate senders and receivers
+        const senderIds = chats.map(chat => chat.sender);
+        const receiverIds = chats.map(chat => chat.receiver);
+        const uniqueIds = [...new Set([...senderIds, ...receiverIds])];
+
+        const users = await User.find({ _id: { $in: uniqueIds } }).select("UserName profilePic name email profile");
+        const owners = await Owner.find({ _id: { $in: uniqueIds } }).select("UserName profilePic name email profile");
+
+        const populatedChats = chats.map(chat => {
+            const sender = chat.senderType === "User"
+                ? users.find(user => user._id.equals(chat.sender))
+                : owners.find(owner => owner._id.equals(chat.sender));
+
+            const receiver = chat.receiverType === "User"
+                ? users.find(user => user._id.equals(chat.receiver))
+                : owners.find(owner => owner._id.equals(chat.receiver));
+
+            return {
+                ...chat.toObject(),
+                sender,
+                receiver,
+            };
+        });
+
+        // Map chats to unique chat partners
+        const mapChats = (chats, ownerId) => {
+            return Object.values(
+                chats.reduce((acc, chat) => {
+                    const chatPartner = chat.sender._id.equals(ownerId) ? chat.receiver : chat.sender;
+                    if (!acc[chatPartner._id]) {
+                        acc[chatPartner._id] = {
+                            _id: chat._id,
+                            chatPartner,
+                            lastMessage: chat.message,
+                            lastMessageAt: chat.createdAt,
+                        };
+                    }
+                    return acc;
+                }, {})
+            );
+        };
+
+        // Separate and map user-to-user and user-to-owner chats
+        const recentOwnerToOwnerChats = mapChats(
+            populatedChats.filter(chat => chat.senderType === "Owner" && chat.receiverType === "Owner"),
+            ownerId
+        );
+
+        const recentUserToOwnerChats = mapChats(
+            populatedChats.filter(chat =>
+                (chat.senderType === "User" && chat.receiverType === "Owner") ||
+                (chat.senderType === "Owner" && chat.receiverType === "User")
+            ),
+            ownerId
+        );
+
+        // Return the results
+        res.status(200).json({
+            success: true,
+            ownerToownerChats: recentOwnerToOwnerChats,
+            userToOwnerChats: recentUserToOwnerChats,
+        });
+    } catch (error) {
+        console.error("Error fetching recent chats:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch recent chats" });
+    }
+};
+
+export const newMessages = async (req, res) => {
+    try {
+        const ownerId = req.ownerId; // Get logged-in user ID
+
+        // Find all messages sent to this user that are not yet delivered
+        const undeliveredMessages = await ChatUserOwner.find({
+            receiver: ownerId,
+            status: "sent" // Only messages that are not yet delivered
+        }).sort({ createdAt: -1 });
+
+        if (undeliveredMessages.length === 0) {
+            return res.status(200).json({ success: true, users: [] });
+        }
+
+        // Get unique senders from undelivered messages
+        const senderIds = [...new Set(undeliveredMessages.map(msg => msg.sender.toString()))];
+
+        // Fetch sender details based on senderType (User or Owner)
+        const users = await Promise.all(senderIds.map(async (senderId) => {
+            const message = undeliveredMessages.find(msg => msg.sender.toString() === senderId);
+            if (message.senderType === "User") {
+                const user = await  User.findById(senderId).select("UserName profilePic");
+                return {...user.toObject(), senderType:"User"}
+            } else if (message.senderType === "Owner") {
+                const owner = await Owner.findById(senderId).select("UserName profilePic");
+                return { ...owner.toObject(), senderType: "Owner" };
+            }
+        }));
+
+        // Filter out null values (if any)
+        const filteredUsers = users.filter(user => user !== null);
+
+        return res.status(200).json({ success: true, users: filteredUsers });
+
+    } catch (error) {
+        console.error("Error fetching new messages:", error);
+        res.status(500).json({ success: false, error: "Failed to fetch new messages" });
+    }
+};
+
+export const ownerDetails = async (req,res) => {
+    try {
+        const owner = await Owner.findById( req.ownerId )
+        if(!owner){
+            return res.status(400).json({success:false, message:"owner not found"})
+        }
+
+        res.status(200).json({ success: true, owner:{
+            ...owner._doc,
+            password:undefined,
+            
+        } });
+    } catch (error) {
+        console.error("Error in userDetails:", error);
+        res.status(500).json({ success: false, message: "Server error" }); 
+    }
+}
+
+export const getAllUsers = async (req, res) => {
+    try {
+       
+        const users = await User.find();
+
+        // Sanitize user data
+        const sanitizedUsers = users.map((user) => {
+            const { password, mobile, Bio, GymMember, EventParticipated, ...safeData } = user.toObject();
+            return safeData;
+        });
+
+       
+
+        res.status(200).json({ success: true, message: "Users retrieved successfully", users: sanitizedUsers });
+    } catch (error) {
+        console.error("getAllUsers Error:", error);
+        res.status(500).json({ success: false, error: "Failed to get users" });
+    }
+};
+
+export const getAllOwners = async (req, res) => {
+    try {
+        const ownerId = req.ownerId
+        const owners = await Owner.find();
+
+        // Sanitize user data
+        const sanitizedOwners = owners.map((user) => {
+            const { password, contactNumber, gyms, isVerified, ...safeData } = user.toObject();
+            return safeData;
+        });
+
+        const sanitized = sanitizedOwners.filter(u=>u._id.toString() !== ownerId.toString())
+
+        res.status(200).json({ success: true, message: "Users retrieved successfully", owners: sanitized });
+    } catch (error) {
+        console.error("getAllUsers Error:", error);
+        res.status(500).json({ success: false, error: "Failed to get users" });
+    }
+};
+
+export const fetchSingleUser = async (req,res) => {
+    try {
+        const {userId} = req.body
+
+        const user = await User.findById(userId)
+        if(!user){
+            return res.status(400).json({ success: false, error: "user not found" });
+        }
+
+        res.status(200).json({ success: true, user:{
+            ...user._doc,
+            password:undefined,
+            Bio:undefined,
+            Mobile:undefined,
+            GymMember:undefined,
+            EventParticipated:undefined
+        } });
+    } catch (error) {
+        console.error("fetchSingleUser Error:", error);
+        res.status(500).json({ success: false, error: "Failed to fetch single users" });   
+    }
+}
+
+
+export const deleteForMe = async (req,res) => {
+    const {messageId} = req.body
+
+    try {
+        const userId = req.ownerId
+        if (!userId) {
+            return res.status(400).json({ error: "Owner ID is required" });
+        }
+
+        const messages =  await ChatUserOwner.updateOne(
+            { _id: messageId },
+            { $addToSet: { hiddenBy: userId } } // Add userId to "hiddenBy" array (prevents duplicates)
+        );
+        res.json({ success: true, message: "Message hidden successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to hide message" });  
+    }
+}
+
+export const fetchSingleOwner = async (req, res) => {
+    try {
+
+        const { ownerId } = req.body;
+
+        // Check if ownerId is provided
+        if (!ownerId) {
+            return res.status(400).json({ success: false, message: "Owner ID is required" });
+        }
+
+        // Fetch the owner from the database
+        const owner = await Owner.findById(ownerId).select("-password -contactNumber -gyms"); // Exclude the password field
+
+        // Check if the owner exists
+        if (!owner) {
+            return res.status(404).json({ success: false, message: "Owner not found" });
+        }
+
+        // Return the owner details
+        res.status(200).json({ success: true, owner });
+    } catch (error) {
+        console.error("Error fetching owner details:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch owner details" });
+    }
+};
+

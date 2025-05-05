@@ -1,5 +1,5 @@
 import express from "express"
-import { addExerciseName, addSet, addWeight, checkUserAuth, deleteChatHistory, deleteExercise, deleteSet, fetchSingleUser, getAllUsers, getAttendance, getChat, getEvents, getGyms, getMyEvents, getRecentChat, getSingleEquipment, getSingleGym, getSingleTrainer, getUserMembership, Logout, paymentCheckout, paymentEvent, SaveChat, userDetails, userLogin, userRegister } from "../controller/user.controller.js";
+import { addExerciseName, addReviews, addSet, addWeight, checkUserAuth, deleteChatHistory, deleteExercise, deleteForMe, deleteSet, fetchSingleOwner, fetchSingleUser, getAllOwners, getAllUsers, getAttendance, getChat, getEvents, getGyms, getMyEvents, getRecentChat, getReviews, getSingleEquipment, getSingleGym, getSingleTrainer, getUserMembership, Logout, newMessages, paymentCheckout, paymentEvent, SaveChat, userDetails, userLogin, userRegister } from "../controller/user.controller.js";
 import { verifyUserToken } from "../middleware/verifyToken.js";
 
 const router = express.Router()
@@ -55,5 +55,19 @@ router.post('/getAllUsers',verifyUserToken,getAllUsers)
 router.post('/getRecentChat',verifyUserToken,getRecentChat)
 
 router.post('/fetchSingleUser',verifyUserToken,fetchSingleUser)
+
+router.post('/deleteForMe',verifyUserToken,deleteForMe)
+
+// router.post('/deleteForAll',verifyUserToken,deleteForAll)
+
+router.post('/newMessages',verifyUserToken,newMessages)
+
+router.post('/getAllOwners',verifyUserToken,getAllOwners)
+
+router.post('/fetchSingleOwner',verifyUserToken,fetchSingleOwner)
+
+router.post('/addReview',verifyUserToken,addReviews)
+
+router.post('/getReview',verifyUserToken,getReviews)
 
 export default router;

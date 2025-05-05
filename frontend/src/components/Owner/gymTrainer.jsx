@@ -32,6 +32,7 @@ const GymTrainer = () => {
         if (response.data.success) setGyms(response.data.data);
       } catch (error) {
         toast.error("Unable to fetch your gyms");
+        console.error(error)
       }
     };
     fetchGyms();
@@ -47,6 +48,7 @@ const GymTrainer = () => {
         }
       } catch (error) {
         toast.error("Unable to fetch trainer");
+        console.error(error)
       }
     };
     fetchTrainer();
@@ -95,6 +97,7 @@ const GymTrainer = () => {
       }
     } catch (error) {
       toast.error("Failed to update trainer details.");
+      console.error(error)
     }
   };
 

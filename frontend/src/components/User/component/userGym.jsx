@@ -9,6 +9,9 @@ import UserTrainer from "./userTrianer";
 import UserEquip from "./userEquipment";
 import GymEvents from "./gymEvents";
 import Attendance from "./attendance";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000");
 
 const stripePromise = loadStripe("pk_test_51QkVoyE6NniuDuLJRVQgXBm4FAlPQ6QlxY2BcqdBPKULVA1TghsESTyEF2arXJVxPYZnZ7XnJXqbwUPJETpM4HDF00brSmqCTH");
 
@@ -19,8 +22,16 @@ const UserGym = () => {
     const location = useLocation()
     const [page, setPage] = useState(location.state?.page || 1)
     const {gymId} = useParams()
+    const [newUserMessages, setNewUserMessages] = useState(new Set());
+    const [newOwnerMessages, setNewOwnerMessages] = useState(new Set());
+    const [reviews,setReviews] = useState([])
+    const [avgStar, setAvgStar] = useState(0)
+    const [error, setError] = useState(null);
+    const [Addreview, setAddReview] = useState(false)
+    const [comment, setComment] = useState('')
+    const [star, setStar] = useState(null)
  
-    const { gym, ownerName, ownerEmail, user } = useGym();
+    const { gym, ownerName, ownerEmail, user, ownerId } = useGym();
 
     useEffect(()=>{
         if(location.state?.page) setPage(location.state?.page)  
@@ -62,10 +73,80 @@ const UserGym = () => {
         }
     }
 
+    const fetchNewMessages = async () => {
+        try {
+            const response = await axios.post("http://localhost:5000/api/user/newMessages", {}, {
+                withCredentials: true
+            });
+            if (response.data.success) {
+                const users = response.data.users.filter(user => user.senderType === "User");
+                const owners = response.data.users.filter(user => user.senderType === "Owner");
+    
+                // Update states with new message IDs
+                setNewUserMessages(new Set(users.map(user => user._id)));
+                setNewOwnerMessages(new Set(owners.map(owner => owner._id)));
+            }
+        } catch (error) {
+            toast.error("Failed to fetch new messages");
+        }
+    };
+
+    useEffect(()=>{
+
+        const fetchGyms = async () => {
+            try {
+                const response = await axios.post("http://localhost:5000/api/user/getReview", {gymId}, {
+                    withCredentials: true,
+                });
+
+                if (response.data.success) {
+                    setReviews(response.data.reviews)
+                    setAvgStar(response.data.averageRating)
+                }
+            } catch (error) {
+                setError(error.response?.data?.message || "Failed to fetch events");
+                console.error(error);
+            }
+        };
+      
+        fetchGyms();
+   
+    },[gymId])
+
+    useEffect(() => {
+        fetchNewMessages();
+    }, []);
+
+    useEffect(() => {
+        socket.on("newMessage", () => {
+            console.log("New message received! Updating chat...");
+            fetchNewMessages();
+        });
+
+        return () => {
+            socket.off("newMessage");
+        };
+    }, []);
+
+
     if (!gym) {
         return <div className="text-center text-xl py-10">Loading gym details...</div>;
     }
 
+    const onReview = async () => {
+   
+        try {
+           const response = await axios.post("http://localhost:5000/api/user/addReview", {gymId,userName: user.UserName,star,comment}, { withCredentials: true });
+            
+           if(response.data.success){
+                setReviews(...star,response.data.review)
+                toast.success('Review added successfully')
+           }
+        } catch (error) {
+            console.error(error);
+            
+        }
+    }
     return (
     <div>
         <nav className="flex flex-row px-20 py-3 items-center justify-between border-b-2 border-neutral-400 shadow-md bg-white">
@@ -105,9 +186,12 @@ const UserGym = () => {
                                     <FaRegCalendarAlt size={15} className="mr-2"/>
                                     <div> Your Events</div>
                                 </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center">
+                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/messages')}>
                                     <FaRegEnvelope size={15} className="mr-2" />
                                     <div>Messages</div>
+                                    {(newUserMessages.size > 0 || newOwnerMessages.size > 0) && ( // Render red dot if there are new messages
+                                        <span className=" bg-red-500 rounded-full ml-2 px-[4px] p text-sm text-white">{newUserMessages.size + newOwnerMessages.size}</span>
+                                    )}
                                 </li>
                                 <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer" onClick={handleLogout}>
                                     Logout
@@ -129,7 +213,7 @@ const UserGym = () => {
 
         {page === 1 && (
 
-            <div className="mx-[20vw]">
+            <div className="mx-[20vw] mb-8">
 
             
                 {/* Gym Profile Image */}
@@ -264,8 +348,44 @@ const UserGym = () => {
                     <p><strong>Gym Email:</strong> {gym.gymEmail}</p>
                     <p><strong>Owner:</strong> {ownerName}</p>
                     <p><strong>Owner Contact:</strong> {ownerEmail}</p>
-                    <button className="px-4 py-2 rounded-xl border-2 border-green-600 mt-3 text-white bg-green-600 cursor-pointer hover:bg-green-500">Message Owner</button>
+                    <button className="px-4 py-2 rounded-xl border-2 border-green-600 mt-3 text-white bg-green-600 cursor-pointer hover:bg-green-500" onClick={()=>navigate(`/user/owner/messages/${ownerId}`)}>Message Owner</button>
                 </div>
+
+                <div className="flex flex-row justify-between items-center">
+
+                    <div className="text-lg font-semibold mt-8 flex flex-row justify-between items-center">
+                            <h2>Reviews <span className="text-sm text-neutral-700">⭐{avgStar}</span></h2>
+                    </div>
+
+                    <button
+                        className="text-neutral-800 mt-2 mx-2 px-3 py-1 bg-neutral-300 rounded-lg hover:bg-neutral-200 cursor-pointer"
+                        onClick={() => setAddReview(true)}
+                    >
+                        Add Review
+                    </button>
+                </div>
+                    
+                    {/* {error && <p className="text-center text-gray-600 mt-2">{error}</p>} */}
+
+                    {reviews.length > 0 ? (
+                        <div className="mt-4">
+                            <div className="space-y-4">
+                            {reviews.map((review, index) => (
+                                <div key={index} className="border p-4 rounded-lg shadow-md">
+                                <div className="flex items-center space-x-2 mb-2">
+                                    <p className="font-semibold">{review.userName}</p>
+                                </div>
+                                <p className="text-gray-700">{review.comment}</p>
+                                <div className="flex items-center mt-2">
+                                    <span className="text-yellow-500">⭐ {review.star}</span>
+                                </div>
+                                </div>
+                            ))}
+                            </div>
+                        </div>
+                        ) : (
+                            <p className="text-neutral-500 mt-2 text-center">No reviews yet.</p>
+                    )}
             </div>
         )}
 
@@ -282,6 +402,80 @@ const UserGym = () => {
         )}
         {page === 5 && (
             <Attendance/>
+        )}
+
+        {Addreview && (
+        <form onSubmit={onReview}>
+           <div className="fixed inset-0 bg-black/60 bg-opacity-50 z-40"></div>
+         
+           <div className="fixed inset-0 flex items-center justify-center z-50">
+             <div className="bg-white shadow-lg rounded-2xl p-6 w-[30vw] border border-gray-200">
+               <div className="flex flex-row justify-between items-center">
+                 <h2 className="text-2xl font-medium text-black">Add Review</h2>
+                 <button
+                   onClick={() => setAddReview(!Addreview)}
+                   className="text-gray-400 hover:text-gray-600 focus:outline-none hover:cursor-pointer"
+                 >
+                   ✕
+                 </button>
+               </div>
+         
+               <hr className="mt-2 mb-4" />
+         
+               {/* Dropdown for Rating */}
+               <div className="mb-4">
+                 <div className="block text-sm font-medium text-gray-700">UserName: </div>
+                 <div className="text-xl font-semibold">{user.UserName}</div>
+               </div>
+         
+               <div className="mb-4">
+                 <label htmlFor="rating" className="block text-sm font-medium text-gray-700">
+                   Rating
+                 </label>
+                 <select
+                   id="rating"
+                   name="rating"
+                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:outline-none focus:ring focus:border-blue-300"
+                   value={star}
+                   onChange={(e)=>setStar(e.target.value)}
+                 >
+                   {[0,1, 2, 3, 4, 5].map((num) => (
+                     <option key={num} value={num}>
+                       {num}
+                     </option>
+                   ))}
+                 </select>
+               </div>
+         
+               {/* Comment Textarea */}
+               <div className="mb-4">
+                 <label htmlFor="comment" className="block text-sm font-medium text-gray-700">
+                   Comment
+                 </label>
+                 <textarea
+                   id="comment"
+                   name="comment"
+                   value={comment}
+                   onChange={(e)=>setComment(e.target.value)}
+                   rows="4"
+                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:outline-none focus:ring focus:border-blue-300 resize-none"
+                   placeholder="Write your review here..."
+                 ></textarea>
+               </div>
+         
+               {/* Submit Button */}
+               <div className="flex justify-end">
+                 <button
+                   type="submit"
+                   className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                 >
+                   Submit Review
+                 </button>
+               </div>
+             </div>
+           </div>
+        </form>
+         
         )}
 
     </div>

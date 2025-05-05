@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useGym } from "./userContext";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000");
 
 const AIchat = () => {
     const [message, setMessage] = useState("");
@@ -13,6 +16,8 @@ const AIchat = () => {
     const navigate = useNavigate()
     const [isOpen, setIsOpen] = useState(false) 
     const {user} = useGym()
+    const [newUserMessages, setNewUserMessages] = useState(new Set());
+    const [newOwnerMessages, setNewOwnerMessages] = useState(new Set());
 
     useEffect(() => {
         const fetchChatHistory = async () => {
@@ -167,6 +172,41 @@ const AIchat = () => {
         }
     };
 
+    const fetchNewMessages = async () => {
+        try {
+            const response = await axios.post("http://localhost:5000/api/user/newMessages", {}, {
+                withCredentials: true
+            });
+            if (response.data.success) {
+                const users = response.data.users.filter(user => user.senderType === "User");
+                const owners = response.data.users.filter(user => user.senderType === "Owner");
+    
+                // Update states with new message IDs
+                setNewUserMessages(new Set(users.map(user => user._id)));
+                setNewOwnerMessages(new Set(owners.map(owner => owner._id)));
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error("Failed to fetch new messages");
+        }
+    };
+
+    useEffect(() => {
+        fetchNewMessages();
+    }, []);
+
+    useEffect(() => {
+        socket.on("newMessage", () => {
+            console.log("New message received! Updating chat...");
+            fetchNewMessages();
+        });
+
+        return () => {
+            socket.off("newMessage");
+        };
+    }, []);
+
+
     return (
         <div>
             <nav className="flex flex-row px-20 py-3 items-center justify-between border-b-2 border-neutral-400 shadow-md bg-white">
@@ -206,9 +246,12 @@ const AIchat = () => {
                                     <FaRegCalendarAlt size={15} className="mr-2"/>
                                     <div> Your Events</div>
                                 </li>
-                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center">
+                                <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer flex flex-row items-center" onClick={() => navigate('/user/messages')}>
                                     <FaRegEnvelope size={15} className="mr-2" />
                                     <div>Messages</div>
+                                    {(newUserMessages.size > 0 || newOwnerMessages.size > 0) && ( // Render red dot if there are new messages
+                                        <span className=" bg-red-500 rounded-full ml-2 px-[4px] p text-sm text-white">{newUserMessages.size + newOwnerMessages.size}</span>
+                                    )}
                                 </li>
                                 <li className="px-4 py-2 hover:bg-gray-700 cursor-pointer" onClick={handleLogout}>
                                     Logout

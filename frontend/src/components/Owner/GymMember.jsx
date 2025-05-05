@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 import Nav from "./component/Navbar";
-import { LuArrowLeft, LuPencil } from "react-icons/lu";
+import { LuArrowLeft} from "react-icons/lu";
 
 const GymMember = () => {
     const [Gyms, setGyms] = useState([]);
@@ -22,6 +22,7 @@ const GymMember = () => {
                 if (response.data.success) setGyms(response.data.data);
             } catch (error) {
                 toast.error("Unable to fetch your gyms");
+                console.error(error)
             }
         };
         fetchGyms();
@@ -46,6 +47,7 @@ const GymMember = () => {
                 }
             } catch (error) {
                 toast.error("Unable to fetch member details");
+                console.error(error)
             }
         };
         fetchMember();
