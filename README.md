@@ -1,6 +1,31 @@
 <h2>Overview</h2>
 <p>This is a web-based platform that connects gym owners and users, providing an interactive and seamless experience for gym management and membership engagement. The platform includes two main modules: <strong>Owner</strong> and <strong>User</strong>.</p>
 
+<h2>Screenshots</h2>
+<h3>User</h3>
+<img src="./fitnessImage/userHome.jpeg" alt="userHome.jpeg">
+<img src="./fitnessImage/aiChat.png" alt="aiChat.png">
+<img src="./fitnessImage/userMemberships.png" alt="userMemberships.png">
+<img src="./fitnessImage/userParticipantEvents.png" alt="userParticipantEvents.png">
+<img src="./fitnessImage/userAttendance.png" alt="userAttendance.png">
+<img src="./fitnessImage/userTrackWorkout.png" alt="userTrackWorkout.png">
+<img src="./fitnessImage/userChat2.jpeg" alt="userChat2.jpeg">
+<img src="./fitnessImage/userChat1.jpeg" alt="userChat2.jpeg">
+
+
+<h3>Owner</h3>
+<img src="./fitnessImage/ownerHome.jpeg" alt="OwnerHome">
+<img src="./fitnessImage/createGym1.png" alt="createGym1">
+<img src="./fitnessImage/createGym7.png" alt="createGym7">
+<img src="./fitnessImage/ownerMember1.png" alt="ownerMember1">
+<img src="./fitnessImage/ownerMember2.png" alt="ownerMember1">
+<img src="./fitnessImage/ownerAddEvent.png" alt="ownerAddEvent">
+<img src="./fitnessImage/ownerAddEvent2.png" alt="ownerAddEvent2">
+<img src="./fitnessImage/ownerGym1.png" alt="ownerGym1">
+<img src="./fitnessImage/ownerGym2.png" alt="ownerGym2">
+<img src="./fitnessImage/ownerGym3.png" alt="ownerGym3">
+<img src="./fitnessImage/ownerGym4.png" alt="ownerGym4">
+
 <h2>Features</h2>
 <h3>Owner Module</h3>
 <ul>
